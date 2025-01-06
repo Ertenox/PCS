@@ -1,14 +1,13 @@
 from flask import Flask, request, jsonify
-import git
+import os
 
 
 app = Flask(__name__)
 
 @app.route('/process', methods=['GET'])
 def process_data():
-    
-    git.Git().clone("https://github.com/DavidIMT/Tuto-Web-service.git")
-    return "200"
+    os.system("/opt/homebrew/bin/python3.11 ../main.py")
+    return jsonify({"status": "success"})
 
 @app.route('/index',methods=['GET'])
 def frontend():
