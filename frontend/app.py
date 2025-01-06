@@ -63,7 +63,10 @@ def process_data():
 
 @app.route('/index',methods=['GET'])
 def frontend():
-    return '''<script src="//ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js"></script>
+  if session.get('github_token') is None:
+    return redirect(url_for('login'))
+
+  return '''<script src="//ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js"></script>
 <script type=text/javascript>
         $(function() {
           $('a#test').on('click', function(e) {
