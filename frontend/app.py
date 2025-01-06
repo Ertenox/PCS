@@ -27,8 +27,7 @@ github = oauth.remote_app(
 @app.route('/')
 def index():
     if 'github_token' in session:
-        user_info = github.get('user')
-        return jsonify(user_info.data)
+        return '<a href="/logout">Logout</a>'
     return '<a href="/login">Login with GitHub</a>'
 
 @app.route('/login')
@@ -49,8 +48,8 @@ def authorized():
             request.args.get('error_description')
         )
     session['github_token'] = (response['access_token'], '')
-    user_info = github.get('user')
-    return jsonify(user_info.data)
+    #go to frontend
+    return redirect(url_for('frontend'))
 
 @github.tokengetter
 def get_github_oauth_token():
@@ -64,7 +63,7 @@ def process_data():
 @app.route('/index',methods=['GET'])
 def frontend():
   if session.get('github_token') is None:
-    return redirect(url_for('login'))
+    return login()
 
   return '''<script src="//ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js"></script>
 <script type=text/javascript>
