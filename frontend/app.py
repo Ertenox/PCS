@@ -96,6 +96,8 @@ def frontend():
                         console.log(data);
                         const outputElement = document.getElementById('output');
                         outputElement.innerHTML = `<pre>${data.output}</pre>`;
+                        outputElement.innerHTML += `<pre style="color: red;">${data.error}</pre>`;
+
                     })
                     .catch(error => {
                         console.error('Error:', error);
