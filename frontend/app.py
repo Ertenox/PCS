@@ -2,6 +2,7 @@ from flask import Flask, redirect, url_for, session, request, jsonify
 from flask_oauthlib.client import OAuth
 from dotenv import load_dotenv
 import os
+import subprocess
 
 load_dotenv()
 
@@ -55,38 +56,66 @@ def authorized():
 def get_github_oauth_token():
     return session.get('github_token')
 
+
+
 @app.route('/process', methods=['GET'])
 def process_data():
-    os.system("/opt/homebrew/bin/python3.11 ../main.py")
-    return jsonify({"status": "success"})
+    try:
+        # Run the external sc ipt and wait for it to complete
+        result = subprocess.run(
+            ["/opt/homebrew/bin/python3.11", "../main.py"],
+            capture_output=True,
+            text=True
+        )
+        
+        # Log the output for debugging
+        print("Output:", result.stdout)
+        print("Error:", result.stderr)
+        
+        # Return the result
+        if result.returncode == 0:
+            return jsonify({"status": "ok", "output": result.stdout.strip()})
+        else:
+            return jsonify({"status": "error", "error": result.stderr.strip()}), 500
+    except Exception as e:
+        return jsonify({"status": "error", "error": str(e)}), 500
 
-@app.route('/index',methods=['GET'])
+@app.route('/index', methods=['GET'])
 def frontend():
-  if session.get('github_token') is None:
-    return login()
+    if session.get('github_token') is None:
+        return login()
 
-  return '''<script src="//ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js"></script>
-<script type=text/javascript>
-        $(function() {
-          $('a#test').on('click', function(e) {
-            e.preventDefault()
-            $.getJSON('/process',
-                function(data) {
-              //do nothing
+    return '''
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            document.getElementById('test').addEventListener('click', function(e) {
+                e.preventDefault();
+                fetch('/process')
+                    .then(response => response.json())
+                    .then(data => {
+                        console.log(data);
+                        const outputElement = document.getElementById('output');
+                        outputElement.innerHTML = `<pre>${data.output}</pre>`;
+                    })
+                    .catch(error => {
+                        console.error('Error:', error);
+                        document.getElementById('output').innerHTML = `<pre style="color: red;">Error fetching /process: ${error}</pre>`;
+                    });
+
+                return false;
             });
-            return false;
-          });
         });
-</script>
+    </script>
 
-
-<div class='container'>
-    <h3>Test</h3>
+    <div class='container'>
+        <h3>Test</h3>
         <form>
-            <a href=# id=test><button class='btn btn-default'>Test</button></a>
+            <a href="#" id="test"><button class='btn btn-default' type="button">Test</button></a>
         </form>
+        <div id="output" style="margin-top: 20px; font-family: monospace;"></div>
+    </div>
+    '''
 
-</div>'''
 
 if __name__ == '__main__':
     app.run(debug=True)
