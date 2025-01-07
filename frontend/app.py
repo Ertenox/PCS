@@ -63,6 +63,7 @@ def process_data():
     if session.get('github_token') is None:
         return jsonify({"status": "error", "error": "Not authenticated"}), 401
     try:
+        os.chdir("..")
         # Run the external sc ipt and wait for it to complete
         result = subprocess.run(
             ["python", "main.py"],

@@ -6,7 +6,7 @@ import subprocess
 def run_maven():
     print("Compilation Maven en cours...")
 
-    result = subprocess.run(["mvn", "clean", "install"], capture_output=True, text=True, shell=True)
+    result = subprocess.run(["mvn clean install"], capture_output=True, text=True, shell=True)
     if result.returncode == 0:
         print("Maven : Compilation réussi !")
     else:
@@ -19,14 +19,14 @@ def run_maven():
 def run_docker():
     """Lance le conteneur Docker."""
     print("Création de l'image docker...")
-    result = subprocess.run(["docker", "build", "-t", "app", "."], capture_output=True, text=True, shell=True)
+    result = subprocess.run(["docker build -t app ."], capture_output=True, text=True, shell=True)
     if result.returncode == 0:
         print("Docker : Image créée avec succès !")
 
         # Lancement du conteneur Docker
         print("Lancement du conteneur...")
         run_result = subprocess.run(
-            ["docker", "run","-p","8080:8080", "-d", "--name", "app_container", "app"],
+            ["docker run -p 8080:8080 -d --name app_container app"],
             capture_output=True,
             text=True,
             shell=True
@@ -49,7 +49,7 @@ def run_docker():
 
 if __name__ == "__main__":
     if os.path.exists("Tuto-Web-service"):
-        shutil.rmtree("Tuto-Web-service")
+        os.system("rm -rf Tuto-Web-service")
         print("Suppression du dossier existant.")
     print("Clonage du projet...")
     git.Git().clone("https://github.com/DavidIMT/Tuto-Web-service.git")
