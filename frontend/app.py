@@ -60,10 +60,12 @@ def get_github_oauth_token():
 
 @app.route('/process', methods=['GET'])
 def process_data():
+    if session.get('github_token') is None:
+        return jsonify({"status": "error", "error": "Not authenticated"}), 401
     try:
         # Run the external sc ipt and wait for it to complete
         result = subprocess.run(
-            ["/opt/homebrew/bin/python3.11", "main.py"],
+            ["python", "main.py"],
             capture_output=True,
             text=True
         )
@@ -76,14 +78,14 @@ def process_data():
         if result.returncode == 0:
             return jsonify({"status": "ok", "output": result.stdout.strip()})
         else:
-            return jsonify({"status": "error", "error": result.stderr.strip()}), 500
+            return jsonify({"status": "error", "error": result.stdout.strip()}), 500
     except Exception as e:
         return jsonify({"status": "error", "error": str(e)}), 500
 
 @app.route('/index', methods=['GET'])
 def frontend():
     if session.get('github_token') is None:
-        return login()
+        return index()
 
     return '''
     <script>

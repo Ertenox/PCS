@@ -48,8 +48,11 @@ def run_docker():
 
 
 if __name__ == "__main__":
-    #shutil.rmtree("Tuto-Web-service", ignore_errors=True)
-    #git.Git().clone("https://github.com/DavidIMT/Tuto-Web-service.git")
+    if os.path.exists("Tuto-Web-service"):
+        shutil.rmtree("Tuto-Web-service")
+        print("Suppression du dossier existant.")
+    print("Clonage du projet...")
+    git.Git().clone("https://github.com/DavidIMT/Tuto-Web-service.git")
     os.chdir("Tuto-Web-service")
     print("Clonage du projet réussi !")
     run_maven()
