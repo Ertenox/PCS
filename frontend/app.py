@@ -93,6 +93,7 @@ def frontend():
         document.addEventListener('DOMContentLoaded', function() {
             document.getElementById('test').addEventListener('click', function(e) {
                 e.preventDefault();
+                document.getElementById('test').style.display = 'none';
                 fetch('/process')
                     .then(response => response.json())
                     .then(data => {
