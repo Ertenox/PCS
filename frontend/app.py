@@ -63,7 +63,7 @@ def process_data():
     try:
         # Run the external sc ipt and wait for it to complete
         result = subprocess.run(
-            ["/opt/homebrew/bin/python3.11", "../main.py"],
+            ["/opt/homebrew/bin/python3.11", "main.py"],
             capture_output=True,
             text=True
         )
@@ -110,9 +110,9 @@ def frontend():
     </script>
 
     <div class='container'>
-        <h3>Test</h3>
+        <h3>CI/CD Projet</h3>
         <form>
-            <a href="#" id="test"><button class='btn btn-default' type="button">Test</button></a>
+            <a href="#" id="test"><button class='btn btn-default' type="button">Lancer le pipeline de déploiement</button></a>
         </form>
         <div id="output" style="margin-top: 20px; font-family: monospace;"></div>
     </div>
