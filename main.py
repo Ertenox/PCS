@@ -175,7 +175,6 @@ if __name__ == "__main__":
     if sonar_check():
         os.chdir("..")
         run_docker()
-        sonar_check()
 
 
 
