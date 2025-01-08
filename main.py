@@ -4,6 +4,7 @@ import time
 import os
 import subprocess
 import requests
+import time
 from requests.auth import HTTPBasicAuth
 
 def run_maven():
@@ -76,7 +77,7 @@ def sonar_check():
         print("Analyse SonarQube réussie !")
         print("Sortie de l'analyse :")
         print(result.stdout)
-        time.sleep(1)
+        time.sleep(30)
         # Une fois l'analyse terminée, interroger les issues sur SonarQube
         status = get_sonar_issues()
         if status:
@@ -135,3 +136,7 @@ if __name__ == "__main__":
     if sonar_check():
         os.chdir("..")
         run_docker()
+        sonar_check()
+
+
+
