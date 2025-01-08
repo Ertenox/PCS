@@ -3,6 +3,8 @@ from flask_oauthlib.client import OAuth
 from dotenv import load_dotenv
 import os
 import subprocess
+import requests 
+import json
 
 load_dotenv()
 
@@ -40,7 +42,6 @@ def logout():
     session.pop('github_token', None)
     return redirect(url_for('index'))
 
-@app.route('/callback')
 def authorized():
     response = github.authorized_response()
     if response is None or 'access_token' not in response:
@@ -49,12 +50,36 @@ def authorized():
             request.args.get('error_description')
         )
     session['github_token'] = (response['access_token'], '')
-    #go to frontend
+    username = get_username()
+    with open("users.json", "a") as f:
+        if "phoquiche" in username:
+            f.write(json.dumps({"username": username, "role":"admin"}) + "\n")
+        else:    
+            f.write(json.dumps({"username": username, "role":"user"}) + "\n")
     return redirect(url_for('frontend'))
 
 @github.tokengetter
 def get_github_oauth_token():
     return session.get('github_token')
+
+def get_username():
+    token = get_github_oauth_token()[0]
+    print(token)
+    headers = {'Authorization': f'token {token}'}
+    user_info = requests.get("https://api.github.com/user", headers=headers)
+    userdata = user_info.json()
+    print(userdata)
+    username = userdata['login']
+    return username
+def get_role(username):
+    #open the users.json file and get the role corresponding to the username
+    with open("users.json", "r") as f:
+        for line in f:
+            user = json.loads(line)
+            if user["username"] == username:
+                return user["role"]
+
+    return role
 
 
 
