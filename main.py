@@ -7,7 +7,8 @@ from requests.auth import HTTPBasicAuth
 def run_maven():
     """Compile le projet Maven."""
     print("Compilation Maven en cours...")
-    result = subprocess.run(["mvn", "clean", "install"], capture_output=True, text=True, shell=True)
+
+    result = subprocess.run(["mvn clean install"], capture_output=True, text=True, shell=True)
     if result.returncode == 0:
         print("Maven : Compilation réussi !")
     else:
@@ -20,18 +21,24 @@ import subprocess
 
 def run_docker():
     """Lance le conteneur Docker."""
+    id = os.popen("date +%Y%m%d").read().strip()  # Generate a unique ID based on the current date
     print("Création de l'image docker...")
-    result = subprocess.run(["docker", "build", "-t", "app", "."], capture_output=True, text=True, shell=True)
+    result = subprocess.run(
+        ["docker", "build", "-t", f"app_{id}", "."],
+        capture_output=True,
+        text=True,
+        shell=False  # Use a list for arguments and avoid `shell=True` for better security
+    )
     if result.returncode == 0:
         print("Docker : Image créée avec succès !")
 
         # Lancement du conteneur Docker
         print("Lancement du conteneur...")
         run_result = subprocess.run(
-            ["docker", "run", "-d", "--name", "app_container", "app"],
+            [f"docker run -p 8080:8080 -d --name app_container_{id} app_{id}"],
             capture_output=True,
             text=True,
-            shell=True
+            shell=False  # Use a list for arguments
         )
         if run_result.returncode == 0:
             print("Docker : Conteneur lancé avec succès !")
@@ -107,7 +114,10 @@ def get_sonar_issues():
         print("Code de réponse:", response.status_code)
 
 if __name__ == "__main__":
-    #shutil.rmtree("Tuto-Web-service", ignore_errors=True)
+    if os.path.exists("Tuto-Web-service"):
+        os.system("rm -rf Tuto-Web-service")
+        print("Suppression du dossier existant.")
+    print("Clonage du projet...")
     git.Git().clone("https://github.com/DavidIMT/Tuto-Web-service.git")
     os.chdir("Tuto-Web-service")
     run_maven()

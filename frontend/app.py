@@ -63,6 +63,7 @@ def process_data():
     if session.get('github_token') is None:
         return jsonify({"status": "error", "error": "Not authenticated"}), 401
     try:
+        os.chdir("..")
         # Run the external sc ipt and wait for it to complete
         result = subprocess.run(
             ["python", "main.py"],
@@ -92,6 +93,7 @@ def frontend():
         document.addEventListener('DOMContentLoaded', function() {
             document.getElementById('test').addEventListener('click', function(e) {
                 e.preventDefault();
+                document.getElementById('test').style.display = 'none';
                 fetch('/process')
                     .then(response => response.json())
                     .then(data => {
