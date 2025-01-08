@@ -1,4 +1,6 @@
 import git
+import json
+import time
 import os
 import subprocess
 import requests
@@ -17,8 +19,6 @@ def run_maven():
         print(result.stderr)
         exit(result.returncode)
 
-import subprocess
-
 def run_docker():
     """Lance le conteneur Docker."""
     id = os.popen("date +%Y%m%d").read().strip()  # Generate a unique ID based on the current date
@@ -35,7 +35,7 @@ def run_docker():
         # Lancement du conteneur Docker
         print("Lancement du conteneur...")
         run_result = subprocess.run(
-            [f"docker run -p 8080:8080 -d --name app_container_{id} app_{id}"],
+        ["docker", "run", "-p", "8080:8080","-d","--name", f"app_container_{id}",f"app_{id}"],
             capture_output=True,
             text=True,
             shell=False  # Use a list for arguments
@@ -76,6 +76,7 @@ def sonar_check():
         print("Analyse SonarQube réussie !")
         print("Sortie de l'analyse :")
         print(result.stdout)
+        time.sleep(1)
         # Une fois l'analyse terminée, interroger les issues sur SonarQube
         status = get_sonar_issues()
         if status:
@@ -103,11 +104,21 @@ def get_sonar_issues():
 
     # Envoi de la requête HTTP GET
     response = requests.get(url, auth=auth, params=params)
-
     if response.status_code == 200:
-        print("Problèmes récupérés avec succès :")
-        if '"severity":"BLOCKER"' in response.text or '"severity":"HIGH"' in response.text:
-           return False
+        formatted_text = response.text.replace(",", ",\n")
+        formatted_json_lines = formatted_text.splitlines()
+        filtered_json_lines = [line for line in formatted_json_lines if not line.strip().startswith('"message"')]
+
+        # Rejoindre les lignes filtrées
+        filtered_json = "\n".join(filtered_json_lines)
+        data = json.loads(filtered_json.strip())
+
+        # Vérifier la gravité des issues
+        for issue in data.get("issues", []):
+            severity = issue.get('severity')
+            resolution = issue.get('resolution')
+            if severity in ["BLOCKER", "HIGH"] and resolution != "FIXED":
+                return False
         return True
     else:
         print("Erreur lors de la récupération des issues.")
@@ -122,9 +133,5 @@ if __name__ == "__main__":
     os.chdir("Tuto-Web-service")
     run_maven()
     if sonar_check():
-        os.chdir("")
+        os.chdir("..")
         run_docker()
-        sonar_check()
-
-
-
