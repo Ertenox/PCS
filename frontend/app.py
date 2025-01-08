@@ -51,7 +51,10 @@ def authorized():
         )
     session['github_token'] = (response['access_token'], '')
     username = get_username()
+
     with open("users.json", "a") as f:
+        if username in open("users.json").read():
+            return redirect(url_for('frontend'))
         if "phoquiche" in username:
             f.write(json.dumps({"username": username, "role":"admin"}) + "\n")
         else:    
@@ -64,11 +67,9 @@ def get_github_oauth_token():
 
 def get_username():
     token = get_github_oauth_token()[0]
-    print(token)
     headers = {'Authorization': f'token {token}'}
     user_info = requests.get("https://api.github.com/user", headers=headers)
     userdata = user_info.json()
-    print(userdata)
     username = userdata['login']
     return username
 def get_role(username):
@@ -146,6 +147,27 @@ def frontend():
         <div id="output" style="margin-top: 20px; font-family: monospace;"></div>
     </div>
     '''
+@app.route('page_dadmin_supersecret', methods=['GET'])
+def admin_page():
+    if session.get('github_token') is None:
+        return index()
+    username = get_username()
+    role = get_role(username)
+    if role == "admin":
+        #bouton pour supprimer l'application docker
+        return '''
+        <h1>Page d'admin</h1>
+        <p>Vous êtes un admin</p>
+        <form>
+            <a href="#" id="test"><button class='btn btn-default' type="button">Supprimer l'application Library</button></a>
+        </form>
+        '''
+
+    else:
+        return '''
+        <h1>ALERTE</h1>
+        <p>Vous n'êtes pas un admin</p>
+        '''
 
 
 if __name__ == '__main__':
