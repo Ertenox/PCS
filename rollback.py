@@ -12,6 +12,13 @@ def rollback_docker():
         text=True
     )
     if result.returncode == 0:
+        result_image = subprocess.run(["docker", "ps", "-l", "--format", "{{.Image}}"], capture_output=True, text=True)
+        if result_image.returncode != 0:
+            print("Erreur dans la récupération du nom de l'image:", result_image.stderr)
+            exit(result_image.returncode)
+        old_image_name = result_image.stdout.strip()
+
+    if "app" in old_image_name:
         container_id = result.stdout.strip()
         if container_id:
             # Arrêter le conteneur Docker
@@ -47,6 +54,7 @@ def rollback_docker():
                 if run_result.returncode == 0:
                     print("Docker : Rollback effectué avec succcès !")
                     print("ID du conteneur :", run_result.stdout.strip())
+                    
                 else:
                     print("Docker : Erreur lors du lancement du conteneur.")
                     print(run_result.stdout)

@@ -113,15 +113,33 @@ def process_stream():
 def rollback():
     if session.get('github_token') is None:
         return jsonify({"status": "error", "error": "Not authenticated"}), 401
-    else :
-        process = subprocess.Popen(
-        ["python", "/home/cicd/PCS/rollback.py"],
+    try:
+        # Lancement du script avec vérification des erreurs
+        process = subprocess.run(
+            ["python", "/home/cicd/PCS/rollback.py"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            check=True 
         )
-        if process.returncode == 0:
-            return jsonify({"status": "success", "message": "Rollback completed successfully."})
-        else:
-            return jsonify({"status": "error", "error": "Rollback failed."}), 500
+        
+        # Si le script s'exécute sans problème
+        return jsonify({"status": "success", "message": "Rollback completed successfully.", "output": process.stdout}), 200
 
+    except subprocess.CalledProcessError as e:
+        return jsonify({
+            "status": "error",
+            "message": "Rollback failed.",
+            "output": e.output,
+            "error": e.stderr
+        }), 500
+
+    except Exception as e:
+        return jsonify({
+            "status": "error",
+            "message": "An unexpected error occurred.",
+            "details": str(e)
+        }), 500
 
 # Frontend
 @app.route('/index', methods=['GET'])
@@ -180,9 +198,20 @@ def admin_page():
             document.addEventListener('DOMContentLoaded', function() {
                 document.getElementById('rollback').addEventListener('click', function(e) {
                     e.preventDefault();
-                    fetch('/rollback', { method: 'POST' })
-                        .then(alert("Rollback effectué");
-                        );
+                     fetch('/rollback', { method: 'POST' })
+                        .then(response => {
+                            if (!response.ok) {
+                                throw new Error('Network response was not ok');
+                            }
+                            return response.json(); 
+                        })
+                        .then(data => {
+                            alert("Rollback effectué");
+                        })
+                        .catch(error => {
+                            console.error('There was a problem with the fetch operation:', error);
+                            alert('An error occurred during rollback.');
+                        });
                 });
             });
         </script>
