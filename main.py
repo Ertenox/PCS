@@ -128,8 +128,6 @@ def sonar_check():
             return status
     else:
         print("Erreur lors de l'analyse SonarQube.")
-        print("Sortie d'erreur :")
-        print(result.stderr)
 
 def get_sonar_issues():
     """Récupère les issues (bugs, vulnérabilités, smells) du projet via l'API SonarQube."""
@@ -166,8 +164,9 @@ def get_sonar_issues():
         print("Code de réponse:", response.status_code)
 
 if __name__ == "__main__":
-    if os.path.exists("Tuto-Web-service"):
-        os.system("rm -rf Tuto-Web-service")
+    os.chdir("/home/cicd/PCS")
+    if os.path.exists("/home/cicd/PCS/Tuto-Web-service"):
+        os.system("rm -rf /home/cicd/PCS/Tuto-Web-service")
         print("Suppression du dossier existant.")
     print("Clonage du projet...")
     git.Git().clone("https://github.com/Ertenox/Tuto-Web-service.git")
