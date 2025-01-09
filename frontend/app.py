@@ -1,16 +1,18 @@
-from flask import Flask, redirect, url_for, session, request, jsonify
+from flask import Flask, redirect, url_for, session, request, jsonify, Response, stream_with_context
 from flask_oauthlib.client import OAuth
 from dotenv import load_dotenv
 import os
 import subprocess
-import requests 
+import requests
 import json
+import sys
 
 load_dotenv()
 
 app = Flask(__name__)
 app.secret_key = os.getenv("SECRET_KEY")
 
+# OAuth setup
 oauth = OAuth(app)
 github = oauth.remote_app(
     'github',
@@ -26,6 +28,7 @@ github = oauth.remote_app(
     authorize_url='https://github.com/login/oauth/authorize',
 )
 
+# Routes
 @app.route('/')
 def index():
     if 'github_token' in session:
@@ -56,9 +59,9 @@ def authorized():
         if username in open("users.json").read():
             return redirect(url_for('frontend'))
         if "phoquiche" in username:
-            f.write(json.dumps({"username": username, "role":"admin"}) + "\n")
-        else:    
-            f.write(json.dumps({"username": username, "role":"user"}) + "\n")
+            f.write(json.dumps({"username": username, "role": "admin"}) + "\n")
+        else:
+            f.write(json.dumps({"username": username, "role": "user"}) + "\n")
     return redirect(url_for('frontend'))
 
 @github.tokengetter
@@ -70,41 +73,45 @@ def get_username():
     headers = {'Authorization': f'token {token}'}
     user_info = requests.get("https://api.github.com/user", headers=headers)
     userdata = user_info.json()
-    username = userdata['login']
-    return username
+    return userdata['login']
+
 def get_role(username):
     with open("users.json", "r") as f:
         for line in f:
             user = json.loads(line)
             if user["username"] == username:
                 return user["role"]
+    return None
 
-    return role
-
-
-
-@app.route('/process', methods=['GET'])
-def process_data():
+# Real-time process streaming
+@app.route('/process_stream', methods=['GET'])
+def process_stream():
     if session.get('github_token') is None:
         return jsonify({"status": "error", "error": "Not authenticated"}), 401
-    try:
-        os.chdir("..")
-        result = subprocess.run(
-            ["python", "/home/cicd/PCS/main.py"],
-            capture_output=True,
-            text=True
-        )
-        
-        print("Output:", result.stdout)
-        print("Error:", result.stderr)
-        
-        if result.returncode == 0:
-            return jsonify({"status": "ok", "output": result.stdout.strip()})
-        else:
-            return jsonify({"status": "error", "error": result.stdout.strip()}), 500
-    except Exception as e:
-        return jsonify({"status": "error", "error": str(e)}), 500
 
+    def generate():
+        try:
+            process = subprocess.Popen(
+                ["python", "/home/cicd/PCS/main.py"],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True
+            )
+            print(process.stdout)
+            print(process.stderr)
+            while True:
+                output = process.stdout.readline()
+                if output == "" and process.poll() is not None:
+                    break
+                if output:
+                    yield f"data: {output.strip()}\n\n"  # Server-sent event format
+            yield "data: Process completed.\n\n"
+        except Exception as e:
+            yield f"data: ERROR: {str(e)}\n\n"
+
+    return Response(stream_with_context(generate()), content_type='text/event-stream')
+
+# Frontend
 @app.route('/index', methods=['GET'])
 def frontend():
     if session.get('github_token') is None:
@@ -116,19 +123,24 @@ def frontend():
             document.getElementById('test').addEventListener('click', function(e) {
                 e.preventDefault();
                 document.getElementById('test').style.display = 'none';
-                fetch('/process')
-                    .then(response => response.json())
-                    .then(data => {
-                        console.log(data);
-                        const outputElement = document.getElementById('output');
-                        outputElement.innerHTML = `<pre>${data.output}</pre>`;
-                        outputElement.innerHTML += `<pre style="color: red;">${data.error}</pre>`;
 
-                    })
-                    .catch(error => {
-                        console.error('Error:', error);
-                        document.getElementById('output').innerHTML = `<pre style="color: red;">Error fetching /process: ${error}</pre>`;
-                    });
+                const outputElement = document.getElementById('output');
+                outputElement.innerHTML = "<p>Streaming output...</p>";
+
+                const eventSource = new EventSource('/process_stream');
+
+                eventSource.onmessage = function(event) {
+                    const data = event.data;
+                    const pre = document.createElement("pre");
+                    pre.textContent = data;
+                    outputElement.appendChild(pre);
+                    outputElement.scrollTop = outputElement.scrollHeight; // Auto-scroll
+                };
+
+                eventSource.onerror = function() {
+                    outputElement.innerHTML += `<pre style="color: red;">Error: Connection lost or process completed.</pre>`;
+                    eventSource.close();
+                };
 
                 return false;
             });
@@ -136,13 +148,14 @@ def frontend():
     </script>
 
     <div class='container'>
-        <h3>CI/CD Projet</h3>
+        <h3>CI/CD Project</h3>
         <form>
-            <a href="#" id="test"><button class='btn btn-default' type="button">Lancer le pipeline de déploiement</button></a>
+            <a href="#" id="test"><button class='btn btn-default' type="button">Launch Deployment Pipeline</button></a>
         </form>
-        <div id="output" style="margin-top: 20px; font-family: monospace;"></div>
+        <div id="output" style="margin-top: 20px; font-family: monospace; height: 300px; overflow-y: auto; border: 1px solid #ccc; padding: 10px;"></div>
     </div>
     '''
+
 @app.route('/page_dadmin_supersecret', methods=['GET'])
 def admin_page():
     if session.get('github_token') is None:
@@ -151,22 +164,17 @@ def admin_page():
     role = get_role(username)
     if role == "admin":
         return '''
-        <h1>Page d'admin</h1>
-        <p>Vous êtes un admin</p>
+        <h1>Admin Page</h1>
+        <p>You are an admin.</p>
         <form>
-            <a href="#" id="test"><button class='btn btn-default' type="button">Supprimer l'application Library</button></a>
+            <a href="#" id="test"><button class='btn btn-default' type="button">Delete the Library App</button></a>
         </form>
         '''
-
     else:
         return '''
-        <h1>ALERTE</h1>
-        <p>Vous n'êtes pas un admin</p>
+        <h1>ALERT</h1>
+        <p>You are not an admin.</p>
         '''
-
 
 if __name__ == '__main__':
     app.run(debug=True)
-
-
-

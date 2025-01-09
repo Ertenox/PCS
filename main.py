@@ -37,32 +37,35 @@ def run_docker():
             print("No docker images found.")
     else:
         print("Error running docker images command:", result.stderr)
-    oldimagename = second_line.split()[0]
-    oldcontainername = oldimagename.split('_')[0]+"_container_"+oldimagename.split('_')[1]
-    subprocess.run(
-        ["docker", "stop", oldcontainername],
-        capture_output=True,
-        text=True,
-        shell=False
-    )
-    subprocess.run(
-        ["docker", "container", "rm", oldcontainername],
-        capture_output=True,
-        text=True,
-        shell=False
-    )
-    subprocess.run(
-        ["docker", "tag", oldimagename, "app_old"],
-        capture_output=True,
-        text=True,
-        shell=False
-    )
-    subprocess.run(
-        ["docker", "rmi", oldimagename],
-        capture_output=True,
-        text=True,
-        shell=False
-    )
+    try:    
+        oldimagename = second_line.split()[0]
+        oldcontainername = oldimagename.split('_')[0]+"_container_"+oldimagename.split('_')[1]
+        subprocess.run(
+            ["docker", "stop", oldcontainername],
+            capture_output=True,
+            text=True,
+            shell=False
+        )
+        subprocess.run(
+            ["docker", "container", "rm", oldcontainername],
+            capture_output=True,
+            text=True,
+            shell=False
+        )
+        subprocess.run(
+            ["docker", "tag", oldimagename, "app_old"],
+            capture_output=True,
+            text=True,
+            shell=False
+        )
+        subprocess.run(
+            ["docker", "rmi", oldimagename],
+            capture_output=True,
+            text=True,
+            shell=False
+        )
+    except:
+        print("No old image found")    
     result = subprocess.run(
         ["docker", "build", "-t", f"app_{id}", "."],
         capture_output=True,
@@ -114,8 +117,6 @@ def sonar_check():
     # Affichage du résultat
     if result.returncode == 0:
         print("Analyse SonarQube réussie !")
-        print("Sortie de l'analyse :")
-        print(result.stdout)
         time.sleep(30)
         # Une fois l'analyse terminée, interroger les issues sur SonarQube
         status = get_sonar_issues()
