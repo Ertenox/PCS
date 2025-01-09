@@ -5,7 +5,6 @@ import os
 import subprocess
 import requests
 import json
-import sys
 
 load_dotenv()
 
@@ -109,6 +108,21 @@ def process_stream():
 
     return Response(stream_with_context(generate()), content_type='text/event-stream')
 
+# Rollback
+@app.route('/rollback', methods=['POST'])
+def rollback():
+    if session.get('github_token') is None:
+        return jsonify({"status": "error", "error": "Not authenticated"}), 401
+    else :
+        process = subprocess.Popen(
+        ["python", "/home/cicd/PCS/rollback.py"],
+        )
+        if process.returncode == 0:
+            return jsonify({"status": "success", "message": "Rollback completed successfully."})
+        else:
+            return jsonify({"status": "error", "error": "Rollback failed."}), 500
+
+
 # Frontend
 @app.route('/index', methods=['GET'])
 def frontend():
@@ -162,10 +176,21 @@ def admin_page():
     role = get_role(username)
     if role == "admin":
         return '''
+        <script>
+            document.addEventListener('DOMContentLoaded', function() {
+                document.getElementById('rollback').addEventListener('click', function(e) {
+                    e.preventDefault();
+                    fetch('/rollback', { method: 'POST' })
+                        .then(alert("Rollback effectué");
+                        );
+                });
+            });
+        </script>
+
         <h1>Admin Page</h1>
         <p>You are an admin.</p>
         <form>
-            <a href="#" id="test"><button class='btn btn-default' type="button">Delete the Library App</button></a>
+            <a href="#" id="rollback"><button class='btn btn-default' type="button">Rollback</button></a>
         </form>
         '''
     else:
