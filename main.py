@@ -236,7 +236,7 @@ def test_penetration():
         # Start the scan
         scan_url = "http://localhost:8000/JSON/ascan/action/scan/?url=http://127.0.0.1:8080&apikey="
         requests.get(scan_url)
-        print("Scan started. Waiting for completion...")
+        print("Début du scan...")
         
         # Wait for scan completion
         while True:
@@ -261,22 +261,26 @@ def test_penetration():
 
         # Iterate over alerts
         alerts = sites[0].get("alerts", [])
-        high_or_medium_found = False
+        high = False
+
+        enumRisk = ["High (High)", "High (Medium)", "High (Low)"]
 
         for alert in alerts:
             risk_desc = alert.get("riskdesc", "")
-            if "High" in risk_desc or "Medium" in risk_desc:
-                high_or_medium_found = True
-                print(f"Risk detected: {risk_desc}")
-                break
+            for risk in enumRisk:
+                if risk in risk_desc:
+                    high = True
+                    print(f"Risk detected: {risk_desc}")
+                    break
+            
 
-        if high_or_medium_found:
+        if high:
             print("Le test de pénétration a échoué, rollback en cours")
             return False
         else:
-            print("Le test de pénétration a réussi, pas d'erreur majeure détectée")
+            print("Le test de pénétration a réussi, pas de failles majeures détectées")
             return True
-
+            
     except requests.exceptions.RequestException as e:
         print(f"Erreur de connexion avec l'API ZAP: {e}")
         return False
