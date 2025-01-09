@@ -40,7 +40,7 @@ def test_update_book():
 
     # Mettre à jour le livre
     updated_book = {
-        "titre": "Update Title",
+        "titre": "Updated Title",
         "auteur": "Updated Author",
         "price": 25.0
     }

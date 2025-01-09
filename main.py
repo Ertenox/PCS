@@ -1,232 +1,305 @@
-from flask import Flask, redirect, url_for, session, request, jsonify, Response, stream_with_context
-from flask_oauthlib.client import OAuth
-from dotenv import load_dotenv
+import git
+import json
+import time
 import os
 import subprocess
 import requests
-import json
+import time
+from requests.auth import HTTPBasicAuth
+import test_livre_api
+import rollback
+import sys
 
-load_dotenv()
+def run_maven():
+    """Compile le projet Maven."""
+    print("Compilation Maven en cours...", flush=True)
 
-app = Flask(__name__)
-app.secret_key = os.getenv("SECRET_KEY")
+    result = subprocess.run(["mvn clean install"], capture_output=True, text=True, shell=True)
+    if result.returncode == 0:
+        print("Maven : Compilation réussi !", flush=True)
+    else:
+        print("Maven : Erreur de compilation .")
+        print(result.stdout)
+        print(result.stderr)
+        exit(result.returncode)
 
-# OAuth setup
-oauth = OAuth(app)
-github = oauth.remote_app(
-    'github',
-    consumer_key=os.getenv("GITHUB_CLIENT_ID"),
-    consumer_secret=os.getenv("GITHUB_CLIENT_SECRET"),
-    request_token_params={
-        'scope': 'user:email',
-    },
-    base_url='https://api.github.com/',
-    request_token_url=None,
-    access_token_method='POST',
-    access_token_url='https://github.com/login/oauth/access_token',
-    authorize_url='https://github.com/login/oauth/authorize',
-)
+def run_docker():
+    id = os.popen("date +%Y%m%d").read().strip()  
+    print("Commencement des opérations docker...", flush=True)
 
-# Routes
-@app.route('/')
-def index():
-    if 'github_token' in session:
-        return '<a href="/logout">Logout</a>'
-    return '<a href="/login">Login with GitHub</a>'
+    result = subprocess.run(["docker", "ps", "-q", "-l"], capture_output=True, text=True)
+    if result.returncode != 0:
+        print("Erreur dans la récupération du nom du containeur", result.stderr)
+        sys.exit(result.returncode)
+    container_id = result.stdout.strip()
 
-@app.route('/login')
-def login():
-    return github.authorize(callback="http://portable-auguste:5000/callback")
+    result2 = subprocess.run(["docker", "ps", "-l", "--format", "{{.Image}}"], capture_output=True, text=True)
+    if result2.returncode != 0:
+        print("Erreur dans la récupération du nom de l'image:", result2.stderr)
+        sys.exit(result2.returncode)
+    old_image_name = result2.stdout.strip()
 
-@app.route('/logout')
-def logout():
-    session.pop('github_token', None)
-    return redirect(url_for('index'))
+    if "app" in old_image_name:
+        print(f"Image docker existante trouvée: {old_image_name}", flush=True)
 
-@app.route('/callback')
-def authorized():
-    response = github.authorized_response()
-    if response is None or 'access_token' not in response:
-        return 'Access denied: reason={} error={}'.format(
-            request.args.get('error_reason'),
-            request.args.get('error_description')
-        )
-    session['github_token'] = (response['access_token'], '')
-    username = get_username()
+        if container_id:
+            # Stop the old container
+            stop_result = subprocess.run(["docker", "stop", container_id], capture_output=True, text=True)
+            if stop_result.returncode == 0:
+                print("Containeur docker arrêté avec succès.", flush=True)
+            else:
+                print("Erreur dans l'arrêt du containeur précédent: ", stop_result.stderr)
+                sys.exit(stop_result.returncode)
 
-    with open("users.json", "a") as f:
-        if username in open("users.json").read():
-            return redirect(url_for('frontend'))
-        if "phoquiche" in username:
-            f.write(json.dumps({"username": username, "role": "admin"}) + "\n")
+            # Remove the old container
+            rm_result = subprocess.run(["docker", "rm", container_id], capture_output=True, text=True)
+            if rm_result.returncode == 0:
+                print("Containeur supprimé avec succès.", flush=True)
+            else:
+                print("Erreur dans la suppression de:", rm_result.stderr)
+                sys.exit(rm_result.returncode)
+
+        # Tag the old image as `app_old`
+        tag_result = subprocess.run(["docker", "tag", old_image_name, "app_old"], capture_output=True, text=True)
+        if tag_result.returncode == 0:
+            print("Image taggé en 'app_old'.", flush=True)
         else:
-            f.write(json.dumps({"username": username, "role": "user"}) + "\n")
-    return redirect(url_for('frontend'))
+            print("Erreur en taggant l'image:", tag_result.stderr)
+            sys.exit(tag_result.returncode)
 
-@github.tokengetter
-def get_github_oauth_token():
-    return session.get('github_token')
+        # Remove the old image
+        rmi_result = subprocess.run(["docker", "rmi", old_image_name], capture_output=True, text=True)
+        if rmi_result.returncode == 0:
+            print("Ancienne image supprimée avec succès.", flush=True)
+        else:
+            print("Erreur dans la suppression de l'ancienne image:", rmi_result.stderr)
+            sys.exit(rmi_result.returncode)
+    else:
+        print("App n'a jamais existé, création d'une image.", flush=True)
 
-def get_username():
-    token = get_github_oauth_token()[0]
-    headers = {'Authorization': f'token {token}'}
-    user_info = requests.get("https://api.github.com/user", headers=headers)
-    userdata = user_info.json()
-    return userdata['login']
+    # Build the new Docker image
+    new_image_name = f"app_{id}"
+    print(f"Build de l'image: {new_image_name}")
+    build_result = subprocess.run(["docker", "build", "-t", new_image_name, "."], capture_output=True, text=True)
+    if build_result.returncode == 0:
+        print("Image build avec succès.", flush=True)
+    else:
+        print("Erreur dans le build de l'image:", build_result.stderr)
+        sys.exit(build_result.returncode)
 
-def get_role(username):
-    with open("users.json", "r") as f:
-        for line in f:
-            user = json.loads(line)
-            if user["username"] == username:
-                return user["role"]
-    return None
+    # Run the new Docker container
+    container_name = f"app_container_{id}"
+    print(f"Lancement du nouveau conteneur: {container_name}")
+    run_result = subprocess.run(
+        ["docker", "run", "-p", "8080:8080", "-d", "--name", container_name, new_image_name],
+        capture_output=True,
+        text=True
+    )
+    if run_result.returncode == 0:
+        print("Conteneur lancé avec succès.", flush=True)
+        print("Container ID:", run_result.stdout.strip(), flush=True)
+    else:
+        print("Erreur dans le lancement:", run_result.stderr)
+        sys.exit(run_result.returncode)
 
-# Real-time process streaming
-@app.route('/process_stream', methods=['GET'])
-def process_stream():
-    if session.get('github_token') is None:
-        return jsonify({"status": "error", "error": "Not authenticated"}), 401
+def rollback_docker():
+    """Arrête le conteneur Docker."""
+    print("Arrêt du conteneur Docker...", flush=True)
 
-    def generate():
-        try:
-            process = subprocess.Popen(
-                ["python", "/home/cicd/PCS/main.py"],
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
+    # Récupérer l'ID du conteneur Docker
+    result = subprocess.run(
+        ["docker", "ps", "-q", "-l"],
+        capture_output=True,
+        text=True
+    )
+    if result.returncode == 0:
+        container_id = result.stdout.strip()
+        if container_id:
+            # Arrêter le conteneur Docker
+            stop_result = subprocess.run(
+                ["docker", "stop", container_id],
+                capture_output=True,
                 text=True
             )
-            while True:
-                output = process.stdout.readline()
-                if output == "" and process.poll() is not None:
-                    break
-                if output:
-                    yield f"data: {output.strip()}\n\n"  # Server-sent event format
-            yield "data: Process completed.\n\n"
-        except Exception as e:
-            yield f"data: ERROR: {str(e)}\n\n"
-
-    return Response(stream_with_context(generate()), content_type='text/event-stream')
-
-# Rollback
-@app.route('/rollback', methods=['POST'])
-def rollback():
-    if session.get('github_token') is None:
-        return jsonify({"status": "error", "error": "Not authenticated"}), 401
-    try:
-        # Lancement du script avec vérification des erreurs
-        process = subprocess.run(
-            ["python", "/home/cicd/PCS/rollback.py"],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-            check=True 
-        )
-        
-        # Si le script s'exécute sans problème
-        return jsonify({"status": "success", "message": "Rollback completed successfully.", "output": process.stdout}), 200
-
-    except subprocess.CalledProcessError as e:
-        return jsonify({
-            "status": "error",
-            "message": "Rollback failed.",
-            "output": e.output,
-            "error": e.stderr
-        }), 500
-
-    except Exception as e:
-        return jsonify({
-            "status": "error",
-            "message": "An unexpected error occurred.",
-            "details": str(e)
-        }), 500
-
-# Frontend
-@app.route('/index', methods=['GET'])
-def frontend():
-    if session.get('github_token') is None:
-        return index()
-
-    return '''
-    <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            document.getElementById('test').addEventListener('click', function(e) {
-                e.preventDefault();
-                document.getElementById('test').style.display = 'none';
-
-                const outputElement = document.getElementById('output');
-                outputElement.innerHTML = "<p>Streaming output...</p>";
-
-                const eventSource = new EventSource('/process_stream');
-
-                eventSource.onmessage = function(event) {
-                    const data = event.data;
-                    const pre = document.createElement("pre");
-                    pre.textContent = data;
-                    outputElement.appendChild(pre);
-                    outputElement.scrollTop = outputElement.scrollHeight; // Auto-scroll
-                };
-
-                eventSource.onerror = function() {
-                    outputElement.innerHTML += `<pre style="color: red;">Error: Connection lost or process completed.</pre>`;
-                    eventSource.close();
-                };
-
-                return false;
-            });
-        });
-    </script>
-
-    <div class='container'>
-        <h3>CI/CD Project</h3>
-        <form>
-            <a href="#" id="test"><button class='btn btn-default' type="button">Launch Deployment Pipeline</button></a>
-        </form>
-        <div id="output" style="margin-top: 20px; font-family: monospace; height: 300px; overflow-y: auto; border: 1px solid #ccc; padding: 10px;"></div>
-    </div>
-    '''
-
-@app.route('/page_dadmin_supersecret', methods=['GET'])
-def admin_page():
-    if session.get('github_token') is None:
-        return index()
-    username = get_username()
-    role = get_role(username)
-    if role == "admin":
-        return '''
-        <script>
-            document.addEventListener('DOMContentLoaded', function() {
-                document.getElementById('rollback').addEventListener('click', function(e) {
-                    e.preventDefault();
-                     fetch('/rollback', { method: 'POST' })
-                        .then(response => {
-                            if (!response.ok) {
-                                throw new Error('Network response was not ok');
-                            }
-                            return response.json(); 
-                        })
-                        .then(data => {
-                            alert("Rollback effectué");
-                        })
-                        .catch(error => {
-                            console.error('There was a problem with the fetch operation:', error);
-                            alert('An error occurred during rollback.');
-                        });
-                });
-            });
-        </script>
-
-        <h1>Admin Page</h1>
-        <p>You are an admin.</p>
-        <form>
-            <a href="#" id="rollback"><button class='btn btn-default' type="button">Rollback</button></a>
-        </form>
-        '''
+            if stop_result.returncode == 0:
+                print("Conteneur Docker arrêté avec succès.", flush=True)
+                print("Suppression du conteneur Docker...", flush=True)
+                # Supprimer le conteneur Docker
+                rm_result = subprocess.run(
+                    ["docker", "rm", container_id],
+                    capture_output=True,
+                    text=True
+                )
+                if rm_result.returncode == 0:
+                    print("Conteneur Docker supprimé avec succès.", flush=True)
+                else:
+                    print("Erreur lors de la suppression du conteneur Docker.")
+                    print(rm_result.stdout)
+                    print(rm_result.stderr)
+                    exit(rm_result.returncode)
+                # Lancement du conteneur Docker
+                print("Lancement de l'ancien conteneur...", flush=True)
+                run_result = subprocess.run(
+                ["docker", "run", "-p", "8080:8080","-d","--name", f"app_container_rollback",f"app_old"],
+                    capture_output=True,
+                    text=True,
+                    shell=False  
+                )
+                if run_result.returncode == 0:
+                    print("Docker : Rollback effectué avec succcès !", flush=True)
+                    print("ID du conteneur :", run_result.stdout.strip())
+                else:
+                    print("Docker : Erreur lors du lancement du conteneur.")
+                    print(run_result.stdout)
+                    print(run_result.stderr)
+                    exit(run_result.returncode)
+            else:
+                print("Erreur lors de l'arrêt du conteneur Docker.")
+                print(stop_result.stdout)
+                print(stop_result.stderr)
+                exit(stop_result.returncode)
+        else:
+            print("Aucun conteneur Docker n'est en cours d'exécution.", flush=True)
     else:
-        return '''
-        <h1>ALERT</h1>
-        <p>You are not an admin.</p>
-        '''
+        print("Erreur lors de la récupération de l'ID du conteneur Docker.")
+        print(result.stderr)
+        exit(result.returncode)
 
-if __name__ == '__main__':
-    app.run(debug=True)
+def sonar_check():
+    """Lance l'analyse du code via SonarQube."""
+    print("Analyse du code en cours...", flush=True)
+
+    # Définition de la commande sonar-scanner
+    sonar_command = [
+        "/usr/local/sonar-scanner-6.2.1.4610-linux-x64/bin/sonar-scanner",
+        "-Dsonar.projectKey=PCS",
+        "-Dsonar.sources=src/main/java",
+        "-Dsonar.java.binaries=target/classes",
+        "-Dsonar.host.url=http://localhost:9000",
+        "-Dsonar.token=sqp_f0634a9a71da9e04fc44e72daa6e6435abb39766"
+    ]
+
+    # Exécution de la commande et capture de la sortie
+    result = subprocess.run(sonar_command, capture_output=True, text=True)
+    # Affichage du résultat
+    if result.returncode == 0:
+        print("Analyse SonarQube réussie !", flush=True)
+        print("Attente des résultats de l'Analyse (30s)", flush=True)
+        time.sleep(30)
+        # Une fois l'analyse terminée, interroger les issues sur SonarQube
+        status = get_sonar_issues()
+        if status:
+            print("Aucun problème de criticité HIGH ou BLOCKER n'a été détécté", flush=True)
+            return status
+        else:
+            print("Un problème de criticité HIGH ou BLOCKER a été détécté. Le déploiement du code ne peut s'effectuer... Pour plus se rendre sur SonarQube.", flush=True)
+            return status
+    else:
+        print("Erreur lors de l'analyse SonarQube.", flush=True)
+
+def get_sonar_issues():
+    """Récupère les issues (bugs, vulnérabilités, smells) du projet via l'API SonarQube."""
+    # Authentification avec le token SonarQube
+    auth = HTTPBasicAuth('squ_5d90800e0dd7ae983fb4cb10d1ecad57eb9fa440', '')  # Le token en guise de mot de passe
+
+    # URL de l'API pour obtenir les issues
+    url = "http://localhost:9000/api/issues/search"
+    params = {
+        'componentKeys': 'PCS',  # Identifiant du projet
+        'types': 'BUG,VULNERABILITY,CODE_SMELL',  # Types d'issues à récupérer
+    }
+
+    # Envoi de la requête HTTP GET
+    response = requests.get(url, auth=auth, params=params)
+    if response.status_code == 200:
+        formatted_text = response.text.replace(",", ",\n")
+        formatted_json_lines = formatted_text.splitlines()
+        filtered_json_lines = [line for line in formatted_json_lines if not line.strip().startswith('"message"')]
+
+        # Rejoindre les lignes filtrées
+        filtered_json = "\n".join(filtered_json_lines)
+        data = json.loads(filtered_json.strip())
+
+        # Vérifier la gravité des issues
+        for issue in data.get("issues", []):
+            severity = issue.get('severity')
+            resolution = issue.get('resolution')
+            if severity in ["BLOCKER", "HIGH"] and resolution != "FIXED":
+                return False
+        return True
+    else:
+        print("Erreur lors de la récupération des issues.", flush=True)
+        print("Code de réponse:", response.status_code)
+
+def test_penetration():
+    try:
+        
+        print("En attente du démarrage de l'application (30s)", flush=True)
+        time.sleep(40)
+        # Start the scan
+        scan_url = "http://localhost:8000/JSON/ascan/action/scan/?url=http://127.0.0.1:8080&apikey="
+        requests.get(scan_url)
+        print("Début du scan...")
+        # Wait for scan completion
+        response_status = requests.get("http://localhost:8000/JSON/ascan/view/status/").json()
+        status = response_status.get('status')
+        if status == '100':  # Scan complete
+            print("Scan de sécurité réussi", flush=True)
+        # Fetch the scan results
+        report_url = "http://localhost:8000/OTHER/core/other/jsonreport/?apikey="
+        scan_json = requests.get(report_url).json()
+
+        # Check for high or medium risks
+        sites = scan_json.get("site", [])
+        if not sites:
+            print("Site non trouvé.", flush=True)
+            return True  # Assume no issues if no sites are scanned
+
+        # Iterate over alerts
+        alerts = sites[0].get("alerts", [])
+        high = False
+
+        enumRisk = ["High (High)", "High (Medium)", "High (Low)"]
+
+        for alert in alerts:
+            risk_desc = alert.get("riskdesc", "")
+            for risk in enumRisk:
+                if risk in risk_desc:
+                    high = True
+                    print(f"Risk detected: {risk_desc}", flush=True)
+                    break
+        if high:
+            print("Le test de pénétration a échoué, rollback en cours", flush=True)
+            return False
+        else:
+            print("Le test de pénétration a réussi, pas de failles majeures détectées", flush=True)
+            return True
+            
+    except requests.exceptions.RequestException as e:
+        print(f"Erreur de connexion avec l'API ZAP: {e}")
+        return False
+    except KeyError as e:
+        print(f"Erreur dans le traitement de la réponse JSON: clé manquante {e}")
+        return False
+    except Exception as e:
+        print(f"Une erreur inattendue est survenue: {e}")
+        return False
+
+ 
+        
+if __name__ == "__main__":
+    os.chdir("/home/cicd/PCS")
+    if os.path.exists("/home/cicd/PCS/Tuto-Web-service"):
+        os.system("rm -rf /home/cicd/PCS/Tuto-Web-service")
+        print("Suppression du dossier existant.", flush=True)
+    print("Clonage du projet...", flush=True)
+    git.Git().clone("https://github.com/Ertenox/Tuto-Web-service.git")
+    os.chdir("/home/cicd/PCS/Tuto-Web-service")
+    run_maven()
+    if sonar_check():
+        os.chdir("/home/cicd/PCS")
+        run_docker()
+      
+    if test_penetration() == False or test_livre_api.run_tests() == False:
+        rollback.rollback_docker()
+    

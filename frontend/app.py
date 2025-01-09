@@ -94,7 +94,8 @@ def process_stream():
                 ["python", "/home/cicd/PCS/main.py"],
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
-                text=True
+                text=True,
+                bufsize=1
             )
             while True:
                 output = process.stdout.readline()
@@ -192,35 +193,44 @@ def admin_page():
         return index()
     username = get_username()
     role = get_role(username)
+    listUser = ""
+    with open("users.json", "r") as f:
+        for line in f:
+            user = json.loads(line)
+            listUser += f"<li>{user['username']} : {user['role']}</li>"
     if role == "admin":
-        return '''
+        return f'''
         <script>
-            document.addEventListener('DOMContentLoaded', function() {
-                document.getElementById('rollback').addEventListener('click', function(e) {
+            document.addEventListener('DOMContentLoaded', function() {{
+                document.getElementById('rollback').addEventListener('click', function(e) {{
                     e.preventDefault();
-                     fetch('/rollback', { method: 'POST' })
-                        .then(response => {
-                            if (!response.ok) {
+                    fetch('/rollback', {{ method: 'POST' }})
+                        .then(response => {{
+                            if (!response.ok) {{
                                 throw new Error('Network response was not ok');
-                            }
+                            }}
                             return response.json(); 
-                        })
-                        .then(data => {
+                        }})
+                        .then(data => {{
                             alert("Rollback effectué");
-                        })
-                        .catch(error => {
+                        }})
+                        .catch(error => {{
                             console.error('There was a problem with the fetch operation:', error);
                             alert('An error occurred during rollback.');
-                        });
-                });
-            });
+                        }});
+                }});
+            }});
         </script>
 
         <h1>Admin Page</h1>
         <p>You are an admin.</p>
         <form>
-            <a href="#" id="rollback"><button class='btn btn-default' type="button">Rollback</button></a>
+            <button id="rollback" class="btn btn-default" type="button">Rollback</button>
         </form>
+        <h2>Liste des utilisateurs</h2>
+        <ul>
+            {listUser}
+        </ul>
         '''
     else:
         return '''
