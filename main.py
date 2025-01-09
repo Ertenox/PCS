@@ -130,7 +130,7 @@ if __name__ == "__main__":
         os.system("rm -rf Tuto-Web-service")
         print("Suppression du dossier existant.")
     print("Clonage du projet...")
-    git.Git().clone("https://github.com/DavidIMT/Tuto-Web-service.git")
+    git.Git().clone("https://github.com/Ertenox/Tuto-Web-service.git")
     os.chdir("Tuto-Web-service")
     run_maven()
     if sonar_check():
