@@ -170,10 +170,10 @@ if __name__ == "__main__":
         print("Suppression du dossier existant.")
     print("Clonage du projet...")
     git.Git().clone("https://github.com/Ertenox/Tuto-Web-service.git")
-    os.chdir("Tuto-Web-service")
+    os.chdir("/home/cicd/PCS/Tuto-Web-service")
     run_maven()
     if sonar_check():
-        os.chdir("..")
+        os.chdir("/home/cicd/PCS")
         run_docker()
 
 
