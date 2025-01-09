@@ -91,7 +91,7 @@ def process_data():
     try:
         os.chdir("..")
         result = subprocess.run(
-            ["python", "/home/cicd/main.py"],
+            ["python", "/home/cicd/PCS/main.py"],
             capture_output=True,
             text=True
         )
@@ -146,7 +146,7 @@ def frontend():
         <div id="output" style="margin-top: 20px; font-family: monospace;"></div>
     </div>
     '''
-@app.route('page_dadmin_supersecret', methods=['GET'])
+@app.route('/page_dadmin_supersecret', methods=['GET'])
 def admin_page():
     if session.get('github_token') is None:
         return index()
