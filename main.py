@@ -6,6 +6,7 @@ import subprocess
 import requests
 import time
 from requests.auth import HTTPBasicAuth
+import test_livre_api
 
 def run_maven():
     """Compile le projet Maven."""
@@ -160,8 +161,6 @@ def rollback_docker():
         print(result.stderr)
         exit(result.returncode)
 
-
-
 def sonar_check():
     """Lance l'analyse du code via SonarQube."""
     print("Analyse du code en cours...")
@@ -173,7 +172,7 @@ def sonar_check():
         "-Dsonar.sources=src/main/java",
         "-Dsonar.java.binaries=target/classes",
         "-Dsonar.host.url=http://localhost:9000",
-        "-Dsonar.token=sqp_a7c637668c75fa0d80d8b21c4f15cc0adbcd27c1"
+        "-Dsonar.token=sqp_a1d4a682b8407e422bf5ea189a5b0034a826226d"
     ]
 
     # Exécution de la commande et capture de la sortie
@@ -194,11 +193,10 @@ def sonar_check():
     else:
         print("Erreur lors de l'analyse SonarQube.")
 
-
 def get_sonar_issues():
     """Récupère les issues (bugs, vulnérabilités, smells) du projet via l'API SonarQube."""
     # Authentification avec le token SonarQube
-    auth = HTTPBasicAuth('squ_c8f026041b1b34017a4f2a568c9ac4c3a5aa5859', '')  # Le token en guise de mot de passe
+    auth = HTTPBasicAuth('squ_3b7f0dd9512aeb9661715e86561a2bae5f27037d', '')  # Le token en guise de mot de passe
 
     # URL de l'API pour obtenir les issues
     url = "http://localhost:9000/api/issues/search"
@@ -228,8 +226,6 @@ def get_sonar_issues():
     else:
         print("Erreur lors de la récupération des issues.")
         print("Code de réponse:", response.status_code)
-
-
 
 def test_penetration():
     try:
