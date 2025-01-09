@@ -22,7 +22,7 @@ def run_maven():
 
 def run_docker():
     """Lance le conteneur Docker."""
-    id = os.popen("date +%Y%m%d").read().strip()  # Generate a unique ID based on the current date
+    id = os.popen("date +%Y%m%d").read().strip()  
     print("Création de l'image docker...")
     result = subprocess.run(
         ["docker", "images"],
@@ -67,7 +67,7 @@ def run_docker():
         ["docker", "build", "-t", f"app_{id}", "."],
         capture_output=True,
         text=True,
-        shell=False  # Use a list for arguments and avoid `shell=True` for better security
+        shell=False  
     )
     if result.returncode == 0:
         print("Docker : Image créée avec succès !")
@@ -78,7 +78,7 @@ def run_docker():
         ["docker", "run", "-p", "8080:8080","-d","--name", f"app_container_{id}",f"app_{id}"],
             capture_output=True,
             text=True,
-            shell=False  # Use a list for arguments
+            shell=False  
         )
         if run_result.returncode == 0:
             print("Docker : Conteneur lancé avec succès !")

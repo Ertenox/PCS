@@ -26,7 +26,6 @@ github = oauth.remote_app(
     authorize_url='https://github.com/login/oauth/authorize',
 )
 
-# Routes
 @app.route('/')
 def index():
     if 'github_token' in session:
@@ -96,11 +95,9 @@ def process_data():
             text=True
         )
         
-        # Log the output for debugging
         print("Output:", result.stdout)
         print("Error:", result.stderr)
         
-        # Return the result
         if result.returncode == 0:
             return jsonify({"status": "ok", "output": result.stdout.strip()})
         else:
@@ -153,7 +150,6 @@ def admin_page():
     username = get_username()
     role = get_role(username)
     if role == "admin":
-        #bouton pour supprimer l'application docker
         return '''
         <h1>Page d'admin</h1>
         <p>Vous êtes un admin</p>
