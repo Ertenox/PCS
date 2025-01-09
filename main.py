@@ -25,6 +25,45 @@ def run_docker():
     id = os.popen("date +%Y%m%d").read().strip()  # Generate a unique ID based on the current date
     print("Création de l'image docker...")
     result = subprocess.run(
+        ["docker", "images"],
+        capture_output=True,
+        text=True
+    )
+    if result.returncode == 0:
+        lines = result.stdout.strip().split('\n')
+        if len(lines) > 1:
+            second_line = lines[1]
+        else:
+            print("No docker images found.")
+    else:
+        print("Error running docker images command:", result.stderr)
+    oldimagename = second_line.split()[0]
+    oldcontainername = oldimagename.split('_')[0]+"_container_"+oldimagename.split('_')[1]
+    subprocess.run(
+        ["docker", "stop", oldcontainername],
+        capture_output=True,
+        text=True,
+        shell=False
+    )
+    subprocess.run(
+        ["docker", "container", "rm", oldcontainername],
+        capture_output=True,
+        text=True,
+        shell=False
+    )
+    subprocess.run(
+        ["docker", "tag", oldimagename, "app_old"],
+        capture_output=True,
+        text=True,
+        shell=False
+    )
+    subprocess.run(
+        ["docker", "rmi", oldimagename],
+        capture_output=True,
+        text=True,
+        shell=False
+    )
+    result = subprocess.run(
         ["docker", "build", "-t", f"app_{id}", "."],
         capture_output=True,
         text=True,
@@ -136,7 +175,6 @@ if __name__ == "__main__":
     if sonar_check():
         os.chdir("..")
         run_docker()
-        sonar_check()
 
 
 

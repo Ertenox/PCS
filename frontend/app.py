@@ -42,6 +42,7 @@ def logout():
     session.pop('github_token', None)
     return redirect(url_for('index'))
 
+@app.route('/callback')
 def authorized():
     response = github.authorized_response()
     if response is None or 'access_token' not in response:
