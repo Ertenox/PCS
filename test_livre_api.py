@@ -77,14 +77,17 @@ def test_delete_book():
     assert not any(book["id"] == book_id for book in updated_books), "Le livre est toujours présent dans la base de données"
 
 def run_tests():
-    test_get_all_books()
-    test_create_book()
-    test_update_book()
-    test_delete_book()
-
-if __name__ == "__main__":
     try:
-        run_tests()
+        test_get_all_books()
+        test_create_book()
+        test_update_book()
+        test_delete_book()
         print("Tous les tests ont réussi !")
+        return(True)
     except AssertionError as e:
         print("Test failed:", e)
+        return(False)
+
+if __name__ == "__main__":
+    run_tests()
+

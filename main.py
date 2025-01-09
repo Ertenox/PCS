@@ -7,6 +7,7 @@ import requests
 import time
 from requests.auth import HTTPBasicAuth
 import test_livre_api
+import rollback
 
 def run_maven():
     """Compile le projet Maven."""
@@ -291,7 +292,7 @@ def test_penetration():
         
 if __name__ == "__main__":
     os.chdir("/home/cicd/PCS")
-    """if os.path.exists("/home/cicd/PCS/Tuto-Web-service"):
+    if os.path.exists("/home/cicd/PCS/Tuto-Web-service"):
         os.system("rm -rf /home/cicd/PCS/Tuto-Web-service")
         print("Suppression du dossier existant.")
     print("Clonage du projet...")
@@ -300,8 +301,8 @@ if __name__ == "__main__":
     run_maven()
     if sonar_check():
         os.chdir("/home/cicd/PCS")
-        run_docker()"""
+        run_docker()
       
-    if test_penetration() == False:
-        rollback()
+    if test_penetration() or test_livre_api.run_tests() == False:
+        rollback.rollback_docker()
     

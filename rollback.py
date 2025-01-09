@@ -64,4 +64,5 @@ def rollback_docker():
         print(result.stderr)
         exit(result.returncode)
 
-rollback_docker()
+if __name__ == "__main__":
+    rollback_docker() 
