@@ -23,81 +23,83 @@ def run_maven():
         exit(result.returncode)
 
 def run_docker():
-    """Lance le conteneur Docker."""
     id = os.popen("date +%Y%m%d").read().strip()  
-    print("Création de l'image docker...")
-    result = subprocess.run(
-        ["docker", "images"],
+    print("Commencement des opérations docker...")
+
+    result = subprocess.run(["docker", "ps", "-q", "-l"], capture_output=True, text=True)
+    if result.returncode != 0:
+        print("Erreur dans la récupération du nom du containeur", result.stderr)
+        sys.exit(result.returncode)
+    container_id = result.stdout.strip()
+
+    result2 = subprocess.run(["docker", "ps", "-l", "--format", "{{.Image}}"], capture_output=True, text=True)
+    if result2.returncode != 0:
+        print("Erreur dans la récupération du nom de l'image:", result2.stderr)
+        sys.exit(result2.returncode)
+    old_image_name = result2.stdout.strip()
+
+    if "app" in old_image_name:
+        print(f"Image docker existante trouvée: {old_image_name}")
+
+        if container_id:
+            # Stop the old container
+            stop_result = subprocess.run(["docker", "stop", container_id], capture_output=True, text=True)
+            if stop_result.returncode == 0:
+                print("Containeur docker arrêté avec succès.")
+            else:
+                print("Erreur dans l'arrêt du containeur précédent: ", stop_result.stderr)
+                sys.exit(stop_result.returncode)
+
+            # Remove the old container
+            rm_result = subprocess.run(["docker", "rm", container_id], capture_output=True, text=True)
+            if rm_result.returncode == 0:
+                print("Containeur supprimé avec succès.")
+            else:
+                print("Erreur dans la suppression de:", rm_result.stderr)
+                sys.exit(rm_result.returncode)
+
+        # Tag the old image as `app_old`
+        tag_result = subprocess.run(["docker", "tag", old_image_name, "app_old"], capture_output=True, text=True)
+        if tag_result.returncode == 0:
+            print("Image taggé en 'app_old'.")
+        else:
+            print("Erreur en taggant l'image:", tag_result.stderr)
+            sys.exit(tag_result.returncode)
+
+        # Remove the old image
+        rmi_result = subprocess.run(["docker", "rmi", old_image_name], capture_output=True, text=True)
+        if rmi_result.returncode == 0:
+            print("Ancienne image supprimée avec succès.")
+        else:
+            print("Erreur dans la suppression de l'ancienne image:", rmi_result.stderr)
+            sys.exit(rmi_result.returncode)
+    else:
+        print("App n'a jamais existé, création d'une image.")
+
+    # Build the new Docker image
+    new_image_name = f"app_{id}"
+    print(f"Build de l'image: {new_image_name}")
+    build_result = subprocess.run(["docker", "build", "-t", new_image_name, "."], capture_output=True, text=True)
+    if build_result.returncode == 0:
+        print("Image build avec succès.")
+    else:
+        print("Erreur dans le build de l'image:", build_result.stderr)
+        sys.exit(build_result.returncode)
+
+    # Run the new Docker container
+    container_name = f"app_container_{id}"
+    print(f"Lancement du nouveau conteneur: {container_name}")
+    run_result = subprocess.run(
+        ["docker", "run", "-p", "8080:8080", "-d", "--name", container_name, new_image_name],
         capture_output=True,
         text=True
     )
-    if result.returncode == 0:
-        lines = result.stdout.strip().split('\n')
-        if len(lines) > 1:
-            second_line = lines[1]
-        else:
-            print("No docker images found.")
+    if run_result.returncode == 0:
+        print("Conteneur lancé avec succès.")
+        print("Container ID:", run_result.stdout.strip())
     else:
-        print("Error running docker images command:", result.stderr)
-    try:    
-        oldimagename = second_line.split()[0]
-        oldcontainername = oldimagename.split('_')[0]+"_container_"+oldimagename.split('_')[1]
-        subprocess.run(
-            ["docker", "stop", oldcontainername],
-            capture_output=True,
-            text=True,
-            shell=False
-        )
-        subprocess.run(
-            ["docker", "container", "rm", oldcontainername],
-            capture_output=True,
-            text=True,
-            shell=False
-        )
-        subprocess.run(
-            ["docker", "tag", oldimagename, "app_old"],
-            capture_output=True,
-            text=True,
-            shell=False
-        )
-        subprocess.run(
-            ["docker", "rmi", oldimagename],
-            capture_output=True,
-            text=True,
-            shell=False
-        )
-    except:
-        print("No old image found")    
-    result = subprocess.run(
-        ["docker", "build", "-t", f"app_{id}", "."],
-        capture_output=True,
-        text=True,
-        shell=False  
-    )
-    if result.returncode == 0:
-        print("Docker : Image créée avec succès !")
-
-        # Lancement du conteneur Docker
-        print("Lancement du conteneur...")
-        run_result = subprocess.run(
-        ["docker", "run", "-p", "8080:8080","-d","--name", f"app_container_{id}",f"app_{id}"],
-            capture_output=True,
-            text=True,
-            shell=False  
-        )
-        if run_result.returncode == 0:
-            print("Docker : Conteneur lancé avec succès !")
-            print("ID du conteneur :", run_result.stdout.strip())
-        else:
-            print("Docker : Erreur lors du lancement du conteneur.")
-            print(run_result.stdout)
-            print(run_result.stderr)
-            exit(run_result.returncode)
-    else:
-        print("Docker : Erreur lors de la création de l'image.")
-        print(result.stdout)
-        print(result.stderr)
-        exit(result.returncode)
+        print("Erreur dans le lancement:", run_result.stderr)
+        sys.exit(run_result.returncode)
 
 def rollback_docker():
     """Arrête le conteneur Docker."""
