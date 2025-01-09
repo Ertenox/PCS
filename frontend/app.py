@@ -74,7 +74,6 @@ def get_username():
     username = userdata['login']
     return username
 def get_role(username):
-    #open the users.json file and get the role corresponding to the username
     with open("users.json", "r") as f:
         for line in f:
             user = json.loads(line)
@@ -91,9 +90,8 @@ def process_data():
         return jsonify({"status": "error", "error": "Not authenticated"}), 401
     try:
         os.chdir("..")
-        # Run the external sc ipt and wait for it to complete
         result = subprocess.run(
-            ["python", "main.py"],
+            ["python", "/home/cicd/main.py"],
             capture_output=True,
             text=True
         )
