@@ -129,6 +129,7 @@ def sonar_check():
     else:
         print("Erreur lors de l'analyse SonarQube.")
 
+
 def get_sonar_issues():
     """Récupère les issues (bugs, vulnérabilités, smells) du projet via l'API SonarQube."""
     # Authentification avec le token SonarQube
@@ -163,9 +164,69 @@ def get_sonar_issues():
         print("Erreur lors de la récupération des issues.")
         print("Code de réponse:", response.status_code)
 
+
+
+def test_penetration():
+    try:
+        # Start the scan
+        scan_url = "http://localhost:8000/JSON/ascan/action/scan/?url=http://127.0.0.1:8080&apikey="
+        requests.get(scan_url)
+        print("Scan started. Waiting for completion...")
+        
+        # Wait for scan completion
+        while True:
+            response_status = requests.get("http://localhost:8000/JSON/ascan/view/status/").json()
+            status = response_status.get('status')
+            if status == '100':  # Scan complete
+                break
+            print(f"Scan de sécurité en cours")
+            time.sleep(2)
+
+        print("Scan terminé")
+        
+        # Fetch the scan results
+        report_url = "http://localhost:8000/OTHER/core/other/jsonreport/?apikey="
+        scan_json = requests.get(report_url).json()
+
+        # Check for high or medium risks
+        sites = scan_json.get("site", [])
+        if not sites:
+            print("Site non trouvé.")
+            return True  # Assume no issues if no sites are scanned
+
+        # Iterate over alerts
+        alerts = sites[0].get("alerts", [])
+        high_or_medium_found = False
+
+        for alert in alerts:
+            risk_desc = alert.get("riskdesc", "")
+            if "High" in risk_desc or "Medium" in risk_desc:
+                high_or_medium_found = True
+                print(f"Risk detected: {risk_desc}")
+                break
+
+        if high_or_medium_found:
+            print("Le test de pénétration a échoué, rollback en cours")
+            return False
+        else:
+            print("Le test de pénétration a réussi, pas d'erreur majeure détectée")
+            return True
+
+    except requests.exceptions.RequestException as e:
+        print(f"Erreur de connexion avec l'API ZAP: {e}")
+        return False
+    except KeyError as e:
+        print(f"Erreur dans le traitement de la réponse JSON: clé manquante {e}")
+        return False
+    except Exception as e:
+        print(f"Une erreur inattendue est survenue: {e}")
+        return False
+
+ 
+        
 if __name__ == "__main__":
     os.chdir("/home/cicd/PCS")
-    if os.path.exists("/home/cicd/PCS/Tuto-Web-service"):
+    """if os.path.exists("/home/cicd/PCS/Tuto-Web-service"):
         os.system("rm -rf /home/cicd/PCS/Tuto-Web-service")
         print("Suppression du dossier existant.")
     print("Clonage du projet...")
@@ -174,7 +235,8 @@ if __name__ == "__main__":
     run_maven()
     if sonar_check():
         os.chdir("/home/cicd/PCS")
-        run_docker()
-
-
-
+        run_docker()"""
+      
+    if test_penetration() == False:
+        rollback()
+    
