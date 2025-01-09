@@ -97,8 +97,6 @@ def process_stream():
                 stderr=subprocess.PIPE,
                 text=True
             )
-            print(process.stdout)
-            print(process.stderr)
             while True:
                 output = process.stdout.readline()
                 if output == "" and process.poll() is not None:
