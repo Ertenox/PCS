@@ -43,7 +43,6 @@ def run_docker():
         print(f"Image docker existante trouvée: {old_image_name}", flush=True)
 
         if container_id:
-            # Stop the old container
             stop_result = subprocess.run(["docker", "stop", container_id], capture_output=True, text=True)
             if stop_result.returncode == 0:
                 print("Containeur docker arrêté avec succès.", flush=True)
@@ -51,7 +50,6 @@ def run_docker():
                 print("Erreur dans l'arrêt du containeur précédent: ", stop_result.stderr)
                 sys.exit(stop_result.returncode)
 
-            # Remove the old container
             rm_result = subprocess.run(["docker", "rm", container_id], capture_output=True, text=True)
             if rm_result.returncode == 0:
                 print("Containeur supprimé avec succès.", flush=True)
@@ -59,7 +57,6 @@ def run_docker():
                 print("Erreur dans la suppression de:", rm_result.stderr)
                 sys.exit(rm_result.returncode)
 
-        # Tag the old image as `app_old`
         tag_result = subprocess.run(["docker", "tag", old_image_name, "app_old"], capture_output=True, text=True)
         if tag_result.returncode == 0:
             print("Image taggé en 'app_old'.", flush=True)
@@ -67,7 +64,6 @@ def run_docker():
             print("Erreur en taggant l'image:", tag_result.stderr)
             sys.exit(tag_result.returncode)
 
-        # Remove the old image
         rmi_result = subprocess.run(["docker", "rmi", old_image_name], capture_output=True, text=True)
         if rmi_result.returncode == 0:
             print("Ancienne image supprimée avec succès.", flush=True)
@@ -77,7 +73,6 @@ def run_docker():
     else:
         print("App n'a jamais existé, création d'une image.", flush=True)
 
-    # Build the new Docker image
     new_image_name = f"app_{id}"
     print(f"Build de l'image: {new_image_name}")
     build_result = subprocess.run(["docker", "build", "-t", new_image_name, "."], capture_output=True, text=True)
@@ -87,7 +82,6 @@ def run_docker():
         print("Erreur dans le build de l'image:", build_result.stderr)
         sys.exit(build_result.returncode)
 
-    # Run the new Docker container
     container_name = f"app_container_{id}"
     print(f"Lancement du nouveau conteneur: {container_name}")
     run_result = subprocess.run(
