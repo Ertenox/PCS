@@ -36,7 +36,7 @@ def index():
 
 @app.route('/login')
 def login():
-    return github.authorize(callback="http://localhost:5000/callback")
+    return github.authorize(callback="http://127.0.0.1:5000/callback")
 
 @app.route('/logout')
 def logout():
