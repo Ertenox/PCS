@@ -36,7 +36,7 @@ def index():
 
 @app.route('/login')
 def login():
-    return github.authorize(callback="http://portable-auguste:5000/callback")
+    return github.authorize(callback="http://localhost:5000/callback")
 
 @app.route('/logout')
 def logout():
