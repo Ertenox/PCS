@@ -10,6 +10,9 @@ import test_livre_api
 import rollback
 import sys
 
+sqp = [insérer le token de type "Projec Analysis token"]
+squ = [insérer le token de type "User Token"]
+
 def run_maven():
     """Compile le projet Maven."""
     print("Compilation Maven en cours...", flush=True)
@@ -176,7 +179,7 @@ def sonar_check():
         "-Dsonar.sources=src/main/java",
         "-Dsonar.java.binaries=target/classes",
         "-Dsonar.host.url=http://localhost:9000",
-        "-Dsonar.token=sqp_f0634a9a71da9e04fc44e72daa6e6435abb39766"
+        "-Dsonar.token=" + sqp,
     ]
 
     # Exécution de la commande et capture de la sortie
@@ -200,7 +203,7 @@ def sonar_check():
 def get_sonar_issues():
     """Récupère les issues (bugs, vulnérabilités, smells) du projet via l'API SonarQube."""
     # Authentification avec le token SonarQube
-    auth = HTTPBasicAuth('squ_5d90800e0dd7ae983fb4cb10d1ecad57eb9fa440', '')  # Le token en guise de mot de passe
+    auth = HTTPBasicAuth(squ, '') 
 
     # URL de l'API pour obtenir les issues
     url = "http://localhost:9000/api/issues/search"
